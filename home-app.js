@@ -102,15 +102,16 @@ function afficherBarreDeMana({ montant, ritualAccompli }) {
   setTimeout(() => overlay.remove(), 11200);
 }
 
-let regulariteVerifiee = false;
-
 subscribeBooks(renderBookProgress);
 subscribePlayer((player) => {
   renderXp(player);
-  if (!regulariteVerifiee) {
-    regulariteVerifiee = true;
-    creditBonusRegulariteEnAttente()
-      .then((resultat) => { if (resultat && resultat.montant > 0) afficherBarreDeMana(resultat); })
-      .catch((error) => console.error('Impossible de créditer le bonus de Régularité', error));
-  }
+  // Idempotent par nature : bonusRegulariteEnAttente redevient null côté
+  // Firestore dès qu'il est crédité, donc les appels suivants (à chaque
+  // nouveau snapshot du joueur) sont des no-op silencieux. Pas besoin d'un
+  // flag "déjà vérifié" — un tel flag posé sur le tout premier callback
+  // (déclenché avec les données par défaut, avant même que Firestore ait
+  // répondu) empêcherait justement le vrai crédit d'avoir lieu ensuite.
+  creditBonusRegulariteEnAttente()
+    .then((resultat) => { if (resultat && resultat.montant > 0) afficherBarreDeMana(resultat); })
+    .catch((error) => console.error('Impossible de créditer le bonus de Régularité', error));
 });
