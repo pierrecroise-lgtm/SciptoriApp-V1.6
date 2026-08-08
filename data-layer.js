@@ -162,3 +162,82 @@ export async function updateSeance(id, patch) {
   await ready();
   await updateDoc(seanceDoc(id), patch);
 }
+
+// --- Acquisitions (Tableau des Primes) --------------------------------
+// Sous-collection distincte de "books" : une acquisition est une envie
+// (pas encore possédée), qui se transforme en livre de Réserve au moment
+// où elle est "acquise" (cf. acquisitionToBook ci-dessous), puis disparaît
+// de cette liste. Aucune notion de prix/budget ni de lien avec l'XP.
+
+let acquisitionsCache = [];
+let acquisitionsListeners = [];
+let acquisitionsSnapshotStarted = false;
+
+function acquisitionsCollection() {
+  return collection(db, 'users', uid, 'acquisitions');
+}
+
+function acquisitionDoc(id) {
+  return doc(db, 'users', uid, 'acquisitions', id);
+}
+
+async function startListeningAcquisitions() {
+  await ready();
+  if (acquisitionsSnapshotStarted) return;
+  acquisitionsSnapshotStarted = true;
+  onSnapshot(acquisitionsCollection(), (snap) => {
+    acquisitionsCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    acquisitionsListeners.forEach((cb) => cb(acquisitionsCache));
+  });
+}
+
+export function subscribeAcquisitions(callback) {
+  acquisitionsListeners.push(callback);
+  callback(acquisitionsCache);
+  startListeningAcquisitions();
+  return () => {
+    acquisitionsListeners = acquisitionsListeners.filter((cb) => cb !== callback);
+  };
+}
+
+export async function addAcquisition(data) {
+  await ready();
+  await addDoc(acquisitionsCollection(), {
+    title: data.title,
+    author: data.author,
+    genre: data.genre,
+    priorite: Number(data.priorite) || 1,
+    lienExterne: data.lienExterne || '',
+    addedAt: Date.now(),
+    // Angle d'affichage figé à la création (look "punaisé au hasard"),
+    // pour ne pas que chaque avis pivote différemment à chaque rendu.
+    inclinaison: Math.round((Math.random() * 6 - 3) * 10) / 10,
+  });
+}
+
+export async function updateAcquisition(id, patch) {
+  await ready();
+  await updateDoc(acquisitionDoc(id), patch);
+}
+
+export async function deleteAcquisition(id) {
+  await ready();
+  await deleteDoc(acquisitionDoc(id));
+}
+
+/**
+ * Convertit une acquisition en livre de Réserve (statut "backlog",
+ * difficulté par défaut 1 — la difficulté de lecture n'a aucun rapport
+ * avec la priorité d'envie), puis supprime l'avis du tableau.
+ */
+export async function acquerirLivre(acquisition) {
+  await ready();
+  await addBook({
+    title: acquisition.title,
+    author: acquisition.author,
+    genre: acquisition.genre,
+    provenance: 'achete',
+    status: 'backlog',
+  });
+  await deleteAcquisition(acquisition.id);
+}
