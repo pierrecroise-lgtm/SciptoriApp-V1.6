@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Acquisitions — ScriptoriApp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Cinzel:wght@800&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<style>
+  /* acquisition.html reste autonome : tout son CSS et son JS spécifiques
+     sont ici (et dans acquisition-app.js). Seuls la topbar-image, le
+     bandeau de nav et les boutons .btn-dnd viennent de common.css. */
+
+  html, body{ height:100%; margin:0; overflow:hidden; }
+  body{
+    font-size:19px; display:flex; flex-direction:column;
+    --accent-acquisition: #6fbf4f; /* même vert que le grimoire Acquisition sur la Home */
+  }
+  .topbar-rubrique{ flex:none; }
+
+  /* ============ TABLEAU (fond bois — placeholder CSS, à remplacer par
+     une illustration Illustrator le jour où tu veux l'habiller). ============ */
+  .tableau-scene{
+    position:relative; flex:1 1 auto; min-height:0; overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:20px 14px 100px;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 3px, transparent 3px 64px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0 2px, transparent 2px 140px),
+      linear-gradient(180deg, #5c3d22, #4a2f19);
+  }
+
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--parchment,#ede3c8);
+    font-style:italic; opacity:.75; font-size:17px;
+  }
+
+  /* ============ GRILLE D'AVIS ============ */
+  .avis-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
+    gap:22px 16px; list-style:none; margin:0; padding:0;
+  }
+
+  .avis{
+    position:relative; padding:16px 12px 14px;
+    background:
+      linear-gradient(160deg, rgba(255,255,255,.03), transparent 40%),
+      #efe3c4;
+    color:#3a2812;
+    border-radius:2px;
+    box-shadow:0 6px 14px rgba(0,0,0,.45), inset 0 0 0 1px rgba(58,39,23,.15);
+    transform:rotate(var(--incl, 0deg));
+    transition:transform .15s ease;
+  }
+  .avis::before{
+    /* la "punaise" */
+    content:""; position:absolute; top:-7px; left:50%; transform:translateX(-50%);
+    width:12px; height:12px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #e8c073, #a5741f 70%, #6b4a10);
+    box-shadow:0 2px 3px rgba(0,0,0,.5);
+  }
+  .avis::after{
+    /* bord "papier déchiré" simplifié via un dégradé dentelé */
+    content:""; position:absolute; left:0; right:0; bottom:-3px; height:6px;
+    background:linear-gradient(135deg, transparent 50%, #efe3c4 50%) 0 0/8px 8px repeat-x;
+  }
+  .avis:active{ transform:rotate(var(--incl, 0deg)) scale(.97); }
+
+  .avis__genre{
+    display:inline-block; font-size:10px; letter-spacing:.03em;
+    padding:2px 6px; border-radius:8px; margin-bottom:8px;
+    background:rgba(58,39,23,.08); border:1px solid rgba(58,39,23,.3);
+  }
+  .avis__title{
+    margin:0 0 2px; font-family:"Georgia", serif; font-weight:800;
+    font-size:16px; line-height:1.25;
+  }
+  .avis__author{ margin:0 0 8px; font-size:13px; font-style:italic; opacity:.85; }
+  .avis__etoiles{ font-size:15px; letter-spacing:1px; color:#a3791f; margin-bottom:10px; }
+  .avis__etoiles .etoile-vide{ color:rgba(163,121,31,.3); }
+  .avis__lien{
+    display:block; font-size:12px; color:#4a3420; opacity:.75; margin-bottom:10px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .avis__actions{ display:flex; gap:6px; }
+  .btn-acquerir{
+    flex:1; border:none; border-radius:3px; padding:8px 6px;
+    font-family:'Press Start 2P', monospace; font-size:9px; letter-spacing:.02em;
+    color:#0e2409; background:linear-gradient(180deg, #8fe06a, var(--accent-acquisition));
+    box-shadow:0 3px 0 #3d7a29; cursor:pointer;
+  }
+  .btn-acquerir:active{ transform:translateY(2px); box-shadow:0 1px 0 #3d7a29; }
+  .btn-editer{
+    flex:none; width:34px; border:1px solid rgba(58,39,23,.35); border-radius:3px;
+    background:rgba(58,39,23,.06); font-size:15px; cursor:pointer; color:#3a2812;
+  }
+
+  /* ============ TOPBAR — variante sans plaque évolutive, plus simple ============ */
+  .topbar-hint{
+    text-align:center; padding:10px 14px 0; font-size:14px;
+    color:var(--parchment,#ede3c8); opacity:.7; font-style:italic;
+  }
+
+  /* ============ FAB ============ */
+  .fab-add{
+    position:fixed; left:50%; bottom:74px; transform:translateX(-50%); z-index:35;
+    display:flex; align-items:center; gap:8px;
+    background:linear-gradient(180deg, #8fe06a, var(--accent-acquisition)) !important;
+    box-shadow:0 4px 0 #3d7a29 !important; color:#0e2409 !important;
+  }
+  .fab-add svg{ width:14px; height:14px; }
+
+  /* ============ MODALE ============ */
+  .modal-overlay{
+    position:fixed; inset:0; z-index:60; background:rgba(10,7,4,.78);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-overlay.is-open{ display:flex; }
+  .modal-sheet{
+    width:100%; max-width:480px; max-height:88vh; overflow-y:auto;
+    background:linear-gradient(160deg,#2f2013,var(--oak-900));
+    border-top:3px solid var(--brass); border-radius:10px 10px 0 0;
+    padding:18px 18px 26px; box-shadow:0 -8px 30px rgba(0,0,0,.6);
+  }
+  .modal-sheet__handle{ width:40px; height:4px; background:rgba(232,205,148,.3); border-radius:2px; margin:0 auto 14px; }
+  .modal-sheet h2{ font-family:'Cinzel', serif; font-size:20px; color:var(--brass-light); margin:0 0 16px; text-align:center; }
+  .field{ display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+  .field label{ font-size:14px; color:var(--parchment); opacity:.85; }
+  .field input, .field select{
+    font-family:'VT323', monospace; font-size:18px; padding:8px 10px;
+    border:2px solid var(--brass); border-radius:4px; background:#150e07; color:var(--parchment);
+  }
+  .field-hint{ font-size:12px; color:var(--parchment); opacity:.55; text-align:right; }
+  .avis-etoiles{ display:flex; gap:6px; }
+  .avis-etoiles .etoile{ font-size:26px; line-height:1; cursor:pointer; opacity:.35; background:none; border:none; padding:0; color:var(--brass-light,#e8cd94); }
+  .avis-etoiles .etoile.is-active{ opacity:1; }
+  .form-actions{ display:flex; gap:10px; margin-top:16px; }
+  .form-actions .btn-dnd{ flex:1; }
+</style>
+</head>
+<body>
+
+  <nav class="topbar-rubrique">
+    <img src="images/topbar-bg.png" alt="">
+    <h1 class="page-title">Acquisitions</h1>
+  </nav>
+
+  <main class="tableau-scene">
+    <p class="topbar-hint" id="acquisitions-hint">Chargement du tableau…</p>
+    <ul class="avis-grid" id="avis-list"></ul>
+  </main>
+
+  <button class="fab-add btn-dnd" id="open-add-modal" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" /></svg>
+    Placer un avis
+  </button>
+
+  <nav class="rubrique-nav" aria-label="Rubriques">
+    <a href="index.html">Antre</a>
+    <a href="reserve.html">Réserve</a>
+    <a href="encours.html">En cours</a>
+    <a href="notes.html">Guilde</a>
+    <a href="acquisition.html" aria-current="page">Acquis.</a>
+  </nav>
+
+  <div class="modal-overlay" id="modal-avis">
+    <div class="modal-sheet">
+      <div class="modal-sheet__handle"></div>
+      <h2 id="modal-title">Placer un avis</h2>
+      <form id="avis-form">
+        <div class="field">
+          <label for="f-title">Titre</label>
+          <input id="f-title" name="title" type="text" required />
+        </div>
+        <div class="field">
+          <label for="f-author">Auteur</label>
+          <input id="f-author" name="author" type="text" required />
+        </div>
+        <div class="field">
+          <label for="f-genre">Genre littéraire</label>
+          <select id="f-genre" name="genre" required>
+            <option value="fantasy">Fantasy</option>
+            <option value="science-fiction">Science-fiction</option>
+            <option value="medieval-fantastique">Médiéval fantastique</option>
+            <option value="thriller">Thriller</option>
+            <option value="policier">Policier</option>
+            <option value="biographie">Biographie</option>
+            <option value="philosophie">Philosophie</option>
+            <option value="aventure">Aventure</option>
+            <option value="classique">Classique</option>
+            <option value="theatre">Théâtre</option>
+            <option value="poesie">Poésie</option>
+            <option value="essai">Essai</option>
+            <option value="ouvrage-prime">Ouvrage primé</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Priorité de l'envie</label>
+          <div class="avis-etoiles" id="f-priorite-etoiles" role="radiogroup" aria-label="Priorité">
+            <button type="button" class="etoile" data-valeur="1">★</button>
+            <button type="button" class="etoile" data-valeur="2">★</button>
+            <button type="button" class="etoile" data-valeur="3">★</button>
+          </div>
+          <input type="hidden" id="f-priorite" name="priorite" value="1" />
+        </div>
+        <div class="field">
+          <label for="f-lien">Lien (facultatif)</label>
+          <input id="f-lien" name="lienExterne" type="url" placeholder="Fiche libraire, éditeur…" />
+        </div>
+        <div class="form-actions">
+          <button class="btn-dnd btn-dnd--ghost" id="cancel-avis" type="button">Annuler</button>
+          <button class="btn-dnd btn-dnd--danger" id="delete-avis" type="button" hidden>Retirer</button>
+          <button class="btn-dnd" id="modal-submit-btn" type="submit">Placer l'avis</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="acquisition-app.js"></script>
+</body>
+</html>
