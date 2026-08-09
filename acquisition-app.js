@@ -154,11 +154,25 @@ els.form.addEventListener('submit', async (e) => {
 
   if (!payload.title || !payload.author) return;
 
-  if (editingId) {
-    await updateAcquisition(editingId, payload);
-  } else {
-    await addAcquisition(payload);
-  }
+  els.submitBtn.disabled = true;
+  const texteInitial = els.submitBtn.textContent;
+  els.submitBtn.textContent = '…';
 
-  closeModal();
+  try {
+    if (editingId) {
+      await updateAcquisition(editingId, payload);
+    } else {
+      await addAcquisition(payload);
+    }
+    closeModal();
+  } catch (error) {
+    // Le cas le plus probable : les règles de sécurité Firestore n'autorisent
+    // pas encore l'écriture sur la sous-collection "acquisitions" (nouvelle,
+    // à ajouter à côté de celles de "books"/"seances").
+    console.error("Impossible d'enregistrer cet avis", error);
+    alert("Impossible d'enregistrer cet avis. Vérifie ta connexion, ou les règles Firestore si l'erreur persiste (voir la console).");
+  } finally {
+    els.submitBtn.disabled = false;
+    els.submitBtn.textContent = texteInitial;
+  }
 });
